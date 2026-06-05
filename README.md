@@ -1,0 +1,58 @@
+# Brand Domain Vote
+
+Static GitHub Pages voting page for domain shortlist selection.
+
+## Voting model
+
+- Each voter selects one `.com` domestic domain and one overseas domain.
+- The page opens a prefilled GitHub issue for submission.
+- GitHub Actions scans `Vote:` issues, deduplicates by GitHub username, and keeps the latest valid vote from each user.
+- Aggregated results are written to `data/results.json` and read by the page.
+
+## Candidate groups
+
+Domestic `.com`:
+
+- `KunlunGround.com`
+- `OrbitTasker.com`
+- `annocrew.com`
+- `crowdAnno.com`
+
+Overseas:
+
+- `humanbench.ai`
+- `crowdbench.ai`
+- `omnitruth.ai`
+- `nextbench.ai`
+- `evalcrew.ai`
+- `benchcrew.ai`
+- `crewbench.ai`
+- `rubricbench.ai`
+- `judgebench.ai`
+- `omnieval.ai`
+- `omnianno.ai`
+- `omnirubric.ai`
+- `benchgrid.ai`
+- `veribench.ai`
+- `scorebench.ai`
+- `benchscore.ai`
+- `omniverify.ai`
+- `Pronovix.ai`
+- `CorpusFlow.ai`
+- `VelaBase.ai`
+- `PyxisBase.ai`
+- `AIPayout.ai`
+- `AIPayout.io`
+- `DataGigs.ai`
+- `VastPulse.ai`
+- `CogniLoop.ai`
+- `annocrew.ai`
+- `crowdAnno.ai`
+
+## Local preview
+
+```bash
+python3 -m http.server 8787
+```
+
+Open `http://127.0.0.1:8787`.

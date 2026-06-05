@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brand Domain Vote</title>
+  <style>
+    :root {
+      --coral: #ff7d55;
+      --coral-dark: #e86440;
+      --teal: #22bca7;
+      --gold: #f3c500;
+      --violet: #9b58bd;
+      --ink: #25222b;
+      --muted: #7f7882;
+      --paper: #fbfaf7;
+      --line: #e9dfd9;
+      --shadow: 0 18px 48px rgba(56, 42, 48, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      overflow-x: hidden;
+      background: #8b8287;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(150deg, #f4eee9 0%, #b7aaa8 47%, #7a7279 100%);
+      letter-spacing: 0;
+      overflow-x: hidden;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      width: min(100%, 1180px);
+      margin: 0 auto;
+      min-height: 100vh;
+      padding-bottom: 44px;
+      overflow-x: clip;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      min-height: 116px;
+      padding: 24px clamp(18px, 4vw, 34px) 20px;
+      color: white;
+      background: linear-gradient(135deg, #ff8b5d 0%, #ff774f 58%, #ef6b49 100%);
+      box-shadow: 0 12px 24px rgba(119, 83, 78, 0.25);
+    }
+
+    .menu-icon {
+      display: grid;
+      gap: 8px;
+      width: 42px;
+    }
+
+    .menu-icon span {
+      display: block;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .title-block {
+      text-align: center;
+      min-width: 0;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 46px);
+      font-weight: 500;
+      line-height: 1.05;
+    }
+
+    .title-block p {
+      margin: 9px 0 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: clamp(13px, 2vw, 16px);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 999px;
+      background: rgba(190, 85, 54, 0.38);
+      color: white;
+      white-space: nowrap;
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    .pin {
+      width: 23px;
+      height: 23px;
+      border: 2px solid currentColor;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      position: relative;
+    }
+
+    .pin::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 26px clamp(16px, 4vw, 34px) 22px;
+      border: 2px solid var(--coral);
+      border-radius: 11px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .tab {
+      border: 0;
+      min-height: 58px;
+      background: transparent;
+      color: var(--coral-dark);
+      font-size: clamp(17px, 2.5vw, 25px);
+      cursor: pointer;
+      transition: background 180ms ease, color 180ms ease;
+    }
+
+    .tab + .tab {
+      border-left: 2px solid var(--coral);
+    }
+
+    .tab.is-active {
+      background: var(--coral);
+      color: white;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+      gap: 24px;
+      padding: 0 clamp(16px, 4vw, 34px);
+      align-items: start;
+      min-width: 0;
+    }
+
+    .panel {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: white;
+      margin: 2px 4px 0;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: clamp(20px, 2.8vw, 28px);
+      font-weight: 600;
+    }
+
+    .section-title span {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.82);
+      text-align: right;
+    }
+
+    .ticket-list {
+      display: grid;
+      gap: 18px;
+    }
+
+    .ticket {
+      position: relative;
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      min-height: 198px;
+      min-width: 0;
+      filter: drop-shadow(0 10px 18px rgba(37, 34, 43, 0.16));
+    }
+
+    .stub {
+      position: relative;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--stub);
+      border-radius: 6px 0 0 6px;
+      overflow: hidden;
+    }
+
+    .stub::before,
+    .stub::after {
+      content: "";
+      position: absolute;
+      right: -20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #9a9094;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .stub::before {
+      top: -20px;
+    }
+
+    .stub::after {
+      bottom: -20px;
+    }
+
+    .stub-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .ticket-body {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) auto;
+      gap: 20px;
+      min-width: 0;
+      padding: 20px 26px 20px 24px;
+      border-radius: 0 6px 6px 0;
+      background: var(--paper);
+      border: 1px solid rgba(255, 255, 255, 0.65);
+    }
+
+    .ticket-body::before,
+    .ticket-body::after {
+      content: "";
+      position: absolute;
+      right: -17px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #9a9094;
+    }
+
+    .ticket-body::before {
+      top: calc(50% - 17px);
+    }
+
+    .ticket-body::after {
+      display: none;
+    }
+
+    .ticket-main {
+      min-width: 0;
+    }
+
+    .domain {
+      margin: 0;
+      font-size: clamp(23px, 3vw, 34px);
+      font-weight: 500;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      margin-top: 14px;
+      font-size: 15px;
+    }
+
+    .mini-icon {
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      color: #8d858d;
+    }
+
+    .barcode {
+      width: min(210px, 100%);
+      height: 44px;
+      margin-top: 20px;
+      background:
+        repeating-linear-gradient(90deg, #1d1a21 0 2px, transparent 2px 5px, #1d1a21 5px 6px, transparent 6px 10px),
+        linear-gradient(#fff, #fff);
+      border: 8px solid white;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+    }
+
+    .ticket-action {
+      display: flex;
+      flex-direction: column;
+      justify-content: end;
+      align-items: end;
+      gap: 14px;
+      min-width: 188px;
+    }
+
+    .votes {
+      color: var(--muted);
+      font-size: 15px;
+      text-align: right;
+    }
+
+    .select-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: 178px;
+      min-height: 58px;
+      padding: 0 20px;
+      border: 3px solid var(--coral);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--coral);
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 150ms ease, background 150ms ease, color 150ms ease;
+    }
+
+    .select-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .select-btn.is-selected {
+      background: var(--coral);
+      color: white;
+    }
+
+    .check {
+      display: grid;
+      place-items: center;
+      width: 33px;
+      height: 33px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .check::after {
+      content: "";
+      width: 13px;
+      height: 8px;
+      border-left: 3px solid white;
+      border-bottom: 3px solid white;
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+
+    .summary {
+      position: sticky;
+      top: 148px;
+      min-width: 0;
+      padding: 22px;
+      border-radius: 8px;
+      background: rgba(251, 250, 247, 0.95);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+
+    .summary h2 {
+      margin: 0 0 14px;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .pick-box {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 8px;
+      background: #f3eee9;
+      border: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+
+    .pick-row {
+      display: grid;
+      grid-template-columns: 68px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    .pick-row strong {
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .submit-btn {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--coral), #ff9b5d);
+      color: white;
+      font-size: 19px;
+      font-weight: 750;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(255, 125, 85, 0.28);
+    }
+
+    .submit-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+      box-shadow: none;
+    }
+
+    .note {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .leaderboard {
+      margin-top: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .rank-card {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #eee3dc;
+    }
+
+    .rank-no {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #f4e9e3;
+      color: var(--coral-dark);
+      font-weight: 800;
+    }
+
+    .rank-name {
+      min-width: 0;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .rank-votes {
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        position: static;
+        order: -1;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .topbar {
+        grid-template-columns: 44px minmax(0, 1fr);
+        min-height: 106px;
+        padding: 22px 20px 18px;
+      }
+
+      .pill {
+        display: none;
+      }
+
+      .title-block h1 {
+        font-size: 30px;
+      }
+
+      .title-block p {
+        max-width: 100%;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .tabs {
+        margin-top: 18px;
+      }
+
+      .tab {
+        min-height: 52px;
+        padding: 0 6px;
+        font-size: 16px;
+        white-space: nowrap;
+      }
+
+      .ticket {
+        grid-template-columns: 76px minmax(0, 1fr);
+        min-height: 238px;
+      }
+
+      .ticket-body {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 18px 18px 18px 20px;
+      }
+
+      .ticket-action {
+        min-width: 0;
+        align-items: start;
+      }
+
+      .votes {
+        text-align: left;
+      }
+
+      .select-btn {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="title-block">
+        <h1>Domain Vote</h1>
+        <p>每人选择 1 个国内 .com 和 1 个海外域名</p>
+      </div>
+      <div class="pill">Brand shortlist <span class="pin" aria-hidden="true"></span></div>
+    </header>
+
+    <nav class="tabs" aria-label="投票视图">
+      <button class="tab is-active" type="button" data-view="domestic">.com 国内</button>
+      <button class="tab" type="button" data-view="overseas">海外域名</button>
+      <button class="tab" type="button" data-view="ranking">榜单</button>
+    </nav>
+
+    <section class="layout">
+      <div class="panel">
+        <div class="section-title">
+          <h2 id="listTitle">.com 国内</h2>
+          <span id="listHint">选择 1 个面向国内传播的 .com 域名</span>
+        </div>
+        <div class="ticket-list" id="ticketList"></div>
+      </div>
+
+      <aside class="summary" aria-label="投票汇总">
+        <h2>My Vote</h2>
+        <div class="pick-box">
+          <div class="pick-row"><span>国内</span><strong id="domesticPick">未选择</strong></div>
+          <div class="pick-row"><span>海外</span><strong id="overseasPick">未选择</strong></div>
+        </div>
+        <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
+        <p class="note">提交会打开 GitHub issue。统计按 GitHub 用户去重，取每个用户最后一次有效投票。</p>
+
+        <div class="leaderboard" id="quickRanking"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const REPO_OWNER = "nolfacalatroni776-design";
+    const REPO_NAME = "brand-domain-vote";
+
+    const domestic = [
+      "KunlunGround.com",
+      "OrbitTasker.com",
+      "annocrew.com",
+      "crowdAnno.com"
+    ];
+
+    const overseas = [
+      "humanbench.ai",
+      "crowdbench.ai",
+      "omnitruth.ai",
+      "nextbench.ai",
+      "evalcrew.ai",
+      "benchcrew.ai",
+      "crewbench.ai",
+      "rubricbench.ai",
+      "judgebench.ai",
+      "omnieval.ai",
+      "omnianno.ai",
+      "omnirubric.ai",
+      "benchgrid.ai",
+      "veribench.ai",
+      "scorebench.ai",
+      "benchscore.ai",
+      "omniverify.ai",
+      "Pronovix.ai",
+      "CorpusFlow.ai",
+      "VelaBase.ai",
+      "PyxisBase.ai",
+      "AIPayout.ai",
+      "AIPayout.io",
+      "DataGigs.ai",
+      "VastPulse.ai",
+      "CogniLoop.ai",
+      "annocrew.ai",
+      "crowdAnno.ai"
+    ];
+
+    const palette = ["#f3c500", "#22bca7", "#9b58bd", "#ff7d55", "#5aa9e6", "#ef5c6e"];
+    const state = {
+      view: "domestic",
+      picks: {
+        domestic: localStorage.getItem("brandVote.domestic") || "",
+        overseas: localStorage.getItem("brandVote.overseas") || ""
+      },
+      results: null
+    };
+
+    const ticketList = document.getElementById("ticketList");
+    const domesticPick = document.getElementById("domesticPick");
+    const overseasPick = document.getElementById("overseasPick");
+    const submitVote = document.getElementById("submitVote");
+    const quickRanking = document.getElementById("quickRanking");
+    const listTitle = document.getElementById("listTitle");
+    const listHint = document.getElementById("listHint");
+
+    function votesFor(group, domain) {
+      return state.results?.[group]?.[domain]?.votes || 0;
+    }
+
+    function renderTickets() {
+      const isDomestic = state.view === "domestic";
+      const items = isDomestic ? domestic : overseas;
+      const group = isDomestic ? "domestic" : "overseas";
+      listTitle.textContent = isDomestic ? ".com 国内" : "海外域名";
+      listHint.textContent = isDomestic ? "选择 1 个面向国内传播的 .com 域名" : "选择 1 个面向海外传播的非 .com 域名";
+
+      ticketList.innerHTML = items.map((domain, index) => {
+        const selected = state.picks[group] === domain;
+        const color = palette[index % palette.length];
+        const voteCount = votesFor(group, domain);
+        return `
+          <article class="ticket" style="--stub:${color}">
+            <div class="stub"><div class="stub-label">#${index + 1}</div></div>
+            <div class="ticket-body">
+              <div class="ticket-main">
+                <h3 class="domain">${domain}</h3>
+                <div class="meta-row">
+                  <svg class="mini-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  <span>${isDomestic ? "Domestic .com ballot" : "Overseas ballot"}</span>
+                </div>
+                <div class="meta-row">
+                  <svg class="mini-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.4" stroke="currentColor" stroke-width="1.8"/></svg>
+                  <span>${voteCount} votes recorded</span>
+                </div>
+                <div class="barcode" aria-hidden="true"></div>
+              </div>
+              <div class="ticket-action">
+                <div class="votes">Rank ${rankFor(group, domain) || "-"}</div>
+                <button class="select-btn ${selected ? "is-selected" : ""}" type="button" data-group="${group}" data-domain="${domain}">
+                  <span class="check" aria-hidden="true"></span>
+                  ${selected ? "SELECTED" : "VOTE"}
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function sortedGroup(group) {
+      const items = group === "domestic" ? domestic : overseas;
+      return items
+        .map((domain) => ({ domain, votes: votesFor(group, domain) }))
+        .sort((a, b) => b.votes - a.votes || a.domain.localeCompare(b.domain));
+    }
+
+    function rankFor(group, domain) {
+      const list = sortedGroup(group);
+      const index = list.findIndex((item) => item.domain === domain);
+      return index >= 0 ? index + 1 : null;
+    }
+
+    function renderRanking() {
+      listTitle.textContent = "榜单";
+      listHint.textContent = `累计 ${state.results?.totalVoters || 0} 位 GitHub 用户有效投票`;
+      const blocks = [
+        ["domestic", ".com 国内排名"],
+        ["overseas", "海外域名排名"]
+      ];
+      ticketList.innerHTML = blocks.map(([group, title]) => `
+        <div class="section-title" style="margin-top:10px"><h2>${title}</h2><span>${state.results?.generatedAt ? new Date(state.results.generatedAt).toLocaleString() : "等待统计"}</span></div>
+        ${sortedGroup(group).map((item, index) => rankMarkup(item, index)).join("")}
+      `).join("");
+    }
+
+    function rankMarkup(item, index) {
+      return `
+        <div class="rank-card">
+          <div class="rank-no">${index + 1}</div>
+          <div class="rank-name">${item.domain}</div>
+          <div class="rank-votes">${item.votes} votes</div>
+        </div>
+      `;
+    }
+
+    function renderSummary() {
+      domesticPick.textContent = state.picks.domestic || "未选择";
+      overseasPick.textContent = state.picks.overseas || "未选择";
+      submitVote.disabled = !(state.picks.domestic && state.picks.overseas);
+      const topDomestic = sortedGroup("domestic").slice(0, 3);
+      const topOverseas = sortedGroup("overseas").slice(0, 3);
+      quickRanking.innerHTML = `
+        <div class="rank-card"><div class="rank-no">D</div><div class="rank-name">国内 Top 3</div><div class="rank-votes"></div></div>
+        ${topDomestic.map((item, index) => rankMarkup(item, index)).join("")}
+        <div class="rank-card"><div class="rank-no">O</div><div class="rank-name">海外 Top 3</div><div class="rank-votes"></div></div>
+        ${topOverseas.map((item, index) => rankMarkup(item, index)).join("")}
+      `;
+    }
+
+    function render() {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.classList.toggle("is-active", tab.dataset.view === state.view);
+      });
+      if (state.view === "ranking") {
+        renderRanking();
+      } else {
+        renderTickets();
+      }
+      renderSummary();
+    }
+
+    function submitUrl() {
+      const payload = {
+        type: "brand-domain-vote",
+        version: 1,
+        domestic: state.picks.domestic,
+        overseas: state.picks.overseas,
+        submittedAt: new Date().toISOString()
+      };
+      const body = [
+        "Brand domain vote",
+        "",
+        "```json",
+        JSON.stringify(payload, null, 2),
+        "```"
+      ].join("\n");
+      const params = new URLSearchParams({
+        title: `Vote: ${state.picks.domestic} + ${state.picks.overseas}`,
+        body
+      });
+      return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
+    }
+
+    document.addEventListener("click", (event) => {
+      const tab = event.target.closest(".tab");
+      if (tab) {
+        state.view = tab.dataset.view;
+        render();
+        return;
+      }
+
+      const button = event.target.closest(".select-btn");
+      if (button) {
+        const group = button.dataset.group;
+        const domain = button.dataset.domain;
+        state.picks[group] = domain;
+        localStorage.setItem(`brandVote.${group}`, domain);
+        render();
+      }
+    });
+
+    submitVote.addEventListener("click", () => {
+      if (submitVote.disabled) return;
+      window.open(submitUrl(), "_blank", "noopener,noreferrer");
+    });
+
+    async function loadResults() {
+      try {
+        const response = await fetch("data/results.json", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        state.results = await response.json();
+      } catch {
+        state.results = {
+          generatedAt: null,
+          totalVoters: 0,
+          domestic: Object.fromEntries(domestic.map((domain) => [domain, { votes: 0 }])),
+          overseas: Object.fromEntries(overseas.map((domain) => [domain, { votes: 0 }]))
+        };
+      }
+      render();
+    }
+
+    loadResults();
+  </script>
+</body>
+</html>

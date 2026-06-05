@@ -1,0 +1,41 @@
+{
+  "generatedAt": null,
+  "totalVoters": 0,
+  "domestic": {
+    "KunlunGround.com": { "votes": 0 },
+    "OrbitTasker.com": { "votes": 0 },
+    "annocrew.com": { "votes": 0 },
+    "crowdAnno.com": { "votes": 0 }
+  },
+  "overseas": {
+    "humanbench.ai": { "votes": 0 },
+    "crowdbench.ai": { "votes": 0 },
+    "omnitruth.ai": { "votes": 0 },
+    "nextbench.ai": { "votes": 0 },
+    "evalcrew.ai": { "votes": 0 },
+    "benchcrew.ai": { "votes": 0 },
+    "crewbench.ai": { "votes": 0 },
+    "rubricbench.ai": { "votes": 0 },
+    "judgebench.ai": { "votes": 0 },
+    "omnieval.ai": { "votes": 0 },
+    "omnianno.ai": { "votes": 0 },
+    "omnirubric.ai": { "votes": 0 },
+    "benchgrid.ai": { "votes": 0 },
+    "veribench.ai": { "votes": 0 },
+    "scorebench.ai": { "votes": 0 },
+    "benchscore.ai": { "votes": 0 },
+    "omniverify.ai": { "votes": 0 },
+    "Pronovix.ai": { "votes": 0 },
+    "CorpusFlow.ai": { "votes": 0 },
+    "VelaBase.ai": { "votes": 0 },
+    "PyxisBase.ai": { "votes": 0 },
+    "AIPayout.ai": { "votes": 0 },
+    "AIPayout.io": { "votes": 0 },
+    "DataGigs.ai": { "votes": 0 },
+    "VastPulse.ai": { "votes": 0 },
+    "CogniLoop.ai": { "votes": 0 },
+    "annocrew.ai": { "votes": 0 },
+    "crowdAnno.ai": { "votes": 0 }
+  },
+  "votes": []
+}
