@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-05T05:22:06.295Z",
+  "generatedAt": "2026-06-05T05:22:40.325Z",
   "totalVoters": 1,
   "domestic": {
     "KunlunGround.com": {
@@ -17,7 +17,7 @@
   },
   "overseas": {
     "humanbench.ai": {
-      "votes": 1
+      "votes": 0
     },
     "crowdbench.ai": {
       "votes": 0
@@ -109,16 +109,13 @@
       "domestic": [
         "KunlunGround.com"
       ],
-      "overseas": [
-        "humanbench.ai"
-      ],
+      "overseas": [],
       "choices": [
-        "KunlunGround.com",
-        "humanbench.ai"
+        "KunlunGround.com"
       ],
-      "issue": "https://github.com/nolfacalatroni776-design/brand-domain-vote/issues/5",
-      "createdAt": "2026-06-05T05:22:00Z",
-      "submittedAt": "2026-06-05T05:22:00.788Z"
+      "issue": "https://github.com/nolfacalatroni776-design/brand-domain-vote/issues/6",
+      "createdAt": "2026-06-05T05:22:27Z",
+      "submittedAt": "2026-06-05T05:22:27.337Z"
     }
   ]
 }
