@@ -875,6 +875,8 @@
     const REPO_NAME = "brand-domain-vote";
     const MAX_VOTES_PER_GROUP = 3;
     const DEFAULT_API_ENDPOINT = "https://brand-domain-vote.vercel.app/api/submit";
+    const DEFAULT_RESULTS_ENDPOINT = "https://brand-domain-vote.vercel.app/api/results";
+    const RESULTS_POLL_INTERVAL_MS = 2000;
 
     const baseDomestic = [
       "KunlunGround.com",
@@ -947,6 +949,7 @@
       voteTone: "",
       isSubmitting: false,
       isAdding: false,
+      isRefreshingResults: false,
       filters: {
         domestic: "",
         overseas: ""
@@ -1091,6 +1094,14 @@
       return DEFAULT_API_ENDPOINT;
     }
 
+    function resultsEndpoint() {
+      if (window.BRAND_VOTE_RESULTS_ENDPOINT) return window.BRAND_VOTE_RESULTS_ENDPOINT;
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname.endsWith(".vercel.app")) {
+        return "/api/results";
+      }
+      return DEFAULT_RESULTS_ENDPOINT;
+    }
+
     async function postSubmission(payload) {
       const response = await fetch(apiEndpoint(), {
         method: "POST",
@@ -1102,6 +1113,15 @@
         throw new Error(data.error || `提交失败：HTTP ${response.status}`);
       }
       return data;
+    }
+
+    async function fetchRealtimeResults() {
+      const response = await fetch(resultsEndpoint(), { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `榜单刷新失败：HTTP ${response.status}`);
+      }
+      return normalizeResult(data.result);
     }
 
     function renderTickets() {
@@ -1397,7 +1417,8 @@
           domain,
           brandAvailableConfirmed: true
         });
-        state.addStatus = "已提交后台校验，通过后会自动进入候选池。";
+        await refreshResults({ rerender: false });
+        state.addStatus = "已添加到候选池，榜单已刷新。";
         state.addTone = "success";
         state.addDraft = {
           brand: "",
@@ -1498,7 +1519,7 @@
       clearVoteDirectly();
     });
 
-    async function loadResults() {
+    async function loadStaticResults() {
       try {
         const response = await fetch("data/results.json", { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1513,6 +1534,34 @@
         });
       }
       render();
+    }
+
+    async function refreshResults({ rerender = true } = {}) {
+      if (state.isRefreshingResults || document.visibilityState === "hidden") return;
+      state.isRefreshingResults = true;
+      try {
+        state.results = await fetchRealtimeResults();
+        if (rerender && state.view !== "add") render();
+      } catch {
+        // Keep the last known ranking; the static load remains the fallback baseline.
+      } finally {
+        state.isRefreshingResults = false;
+      }
+    }
+
+    function startResultsPolling() {
+      window.setInterval(() => {
+        refreshResults();
+      }, RESULTS_POLL_INTERVAL_MS);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") refreshResults();
+      });
+    }
+
+    async function loadResults() {
+      await loadStaticResults();
+      await refreshResults();
+      startResultsPolling();
     }
 
     loadResults();

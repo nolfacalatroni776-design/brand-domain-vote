@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check scripts/count-votes.mjs && node --check api/submit.js"
+    "check": "node --check scripts/count-votes.mjs && node --check api/_shared.js && node --check api/submit.js && node --check api/results.js"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.38.0"
   }
 }
