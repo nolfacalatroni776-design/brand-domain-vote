@@ -214,6 +214,7 @@ function parseVote(issue, maps) {
   if (domestic.length + overseas.length === 0) return null;
 
   return {
+    voterId: payload.voterId || null,
     user: issue.user?.login || "unknown",
     domestic,
     overseas,
@@ -257,9 +258,10 @@ const latestByUser = new Map();
 for (const issue of issues) {
   const vote = parseVote(issue, maps);
   if (!vote) continue;
-  const previous = latestByUser.get(vote.user);
+  const voterKey = vote.voterId || vote.user;
+  const previous = latestByUser.get(voterKey);
   if (!previous || new Date(vote.createdAt) >= new Date(previous.createdAt)) {
-    latestByUser.set(vote.user, vote);
+    latestByUser.set(voterKey, vote);
   }
 }
 

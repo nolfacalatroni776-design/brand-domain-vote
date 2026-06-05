@@ -1,0 +1,9 @@
+{
+  "name": "brand-domain-vote",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check scripts/count-votes.mjs && node --check api/submit.js"
+  }
+}

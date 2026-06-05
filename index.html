@@ -411,6 +411,16 @@
       line-height: 1.5;
     }
 
+    .vote-status.is-success,
+    .add-status.is-success {
+      color: #168873;
+    }
+
+    .vote-status.is-error,
+    .add-status.is-error {
+      color: #b94a36;
+    }
+
     .confetti-layer {
       position: fixed;
       inset: 0;
@@ -515,10 +525,6 @@
       min-height: 20px;
     }
 
-    .add-status.is-error {
-      color: #b94a36;
-    }
-
     .check-row {
       display: flex;
       align-items: flex-start;
@@ -599,6 +605,35 @@
       overflow-wrap: anywhere;
     }
 
+    .identity-card {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 16px;
+    }
+
+    .identity-card span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .voter-input {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .voter-input:focus {
+      border-color: var(--coral);
+      box-shadow: 0 0 0 4px rgba(255, 125, 85, 0.13);
+    }
+
     .submit-btn {
       width: 100%;
       min-height: 58px;
@@ -616,6 +651,11 @@
       cursor: not-allowed;
       opacity: 0.48;
       box-shadow: none;
+    }
+
+    .submit-btn.is-busy {
+      cursor: wait;
+      opacity: 0.72;
     }
 
     .note {
@@ -795,9 +835,13 @@
       <aside class="summary" aria-label="投票汇总">
         <h2>My Vote</h2>
         <div class="pick-box" id="pickBox"></div>
+        <label class="identity-card" for="voterInput">
+          <span>投票人标识</span>
+          <input class="voter-input" id="voterInput" type="text" autocomplete="name" placeholder="姓名或工号">
+        </label>
         <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
         <p class="vote-status" id="voteStatus"></p>
-        <p class="note">提交会打开 GitHub issue。每组最多 3 票，可以只提交 1 票或 2 票；统计按 GitHub 用户去重，取最后一次有效提交。</p>
+        <p class="note">提交后会直接记录，榜单通常几十秒内刷新。每组最多 3 票，可以只提交 1 票或 2 票；统计按投票人标识去重，取最后一次有效提交。</p>
 
         <div class="leaderboard" id="quickRanking"></div>
       </aside>
@@ -808,6 +852,7 @@
     const REPO_OWNER = "nolfacalatroni776-design";
     const REPO_NAME = "brand-domain-vote";
     const MAX_VOTES_PER_GROUP = 3;
+    const DEFAULT_API_ENDPOINT = "https://brand-domain-vote.vercel.app/api/submit";
 
     const baseDomestic = [
       "KunlunGround.com",
@@ -868,8 +913,18 @@
         overseas: storedGroup("brandVote.overseasChoices", "brandVote.overseas")
       },
       results: null,
+      voterKey: localStorage.getItem("brandVote.voterKey") || "",
       addStatus: "",
+      addTone: "",
+      addDraft: {
+        brand: "",
+        domain: "",
+        brandAvailable: false
+      },
       voteStatus: "",
+      voteTone: "",
+      isSubmitting: false,
+      isAdding: false,
       filters: {
         domestic: "",
         overseas: ""
@@ -878,6 +933,7 @@
 
     const ticketList = document.getElementById("ticketList");
     const pickBox = document.getElementById("pickBox");
+    const voterInput = document.getElementById("voterInput");
     const submitVote = document.getElementById("submitVote");
     const voteStatus = document.getElementById("voteStatus");
     const quickRanking = document.getElementById("quickRanking");
@@ -908,6 +964,15 @@
 
     function normalizeBrand(value) {
       return String(value || "").trim().replace(/\s+/g, " ");
+    }
+
+    function normalizeVoterKey(value) {
+      return String(value || "").trim().replace(/\s+/g, " ");
+    }
+
+    function validVoterKey(value) {
+      const normalized = normalizeVoterKey(value);
+      return normalized.length >= 2 && normalized.length <= 80;
     }
 
     function validBrand(brand) {
@@ -974,6 +1039,27 @@
       return state.results?.[group]?.[domain]?.votes || 0;
     }
 
+    function apiEndpoint() {
+      if (window.BRAND_VOTE_API_ENDPOINT) return window.BRAND_VOTE_API_ENDPOINT;
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname.endsWith(".vercel.app")) {
+        return "/api/submit";
+      }
+      return DEFAULT_API_ENDPOINT;
+    }
+
+    async function postSubmission(payload) {
+      const response = await fetch(apiEndpoint(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `提交失败：HTTP ${response.status}`);
+      }
+      return data;
+    }
+
     function renderTickets() {
       const isDomestic = state.view === "domestic";
       const group = isDomestic ? "domestic" : "overseas";
@@ -1036,7 +1122,7 @@
 
     function renderRanking() {
       listTitle.textContent = "榜单";
-      listHint.textContent = `累计 ${state.results?.totalVoters || 0} 位 GitHub 用户有效投票`;
+      listHint.textContent = `累计 ${state.results?.totalVoters || 0} 位投票人有效提交`;
       filterBar.classList.add("hidden");
       const blocks = [
         ["domestic", ".com 国内排名"],
@@ -1072,18 +1158,18 @@
             </div>
             <form class="add-form" id="addDomainForm">
               <label class="field-label" for="brandInput">品牌名</label>
-              <input class="domain-input" id="brandInput" name="brand" type="text" autocomplete="off" placeholder="FreshBrand" value="">
+              <input class="domain-input" id="brandInput" name="brand" type="text" autocomplete="off" placeholder="FreshBrand" value="${escapeHtml(state.addDraft.brand)}" ${state.isAdding ? "disabled" : ""}>
               <label class="field-label" for="domainInput">域名</label>
               <div class="domain-input-row">
-                <input class="domain-input" id="domainInput" name="domain" type="text" inputmode="url" autocomplete="off" placeholder="example.ai 或 example.com" value="">
-                <button class="submit-btn add-btn" type="submit">添加域名</button>
+                <input class="domain-input" id="domainInput" name="domain" type="text" inputmode="url" autocomplete="off" placeholder="example.ai 或 example.com" value="${escapeHtml(state.addDraft.domain)}" ${state.isAdding ? "disabled" : ""}>
+                <button class="submit-btn add-btn ${state.isAdding ? "is-busy" : ""}" type="submit" ${state.isAdding ? "disabled" : ""}>${state.isAdding ? "提交中..." : "添加域名"}</button>
               </div>
               <label class="check-row" for="brandAvailable">
-                <input id="brandAvailable" name="brandAvailable" type="checkbox">
+                <input id="brandAvailable" name="brandAvailable" type="checkbox" ${state.addDraft.brandAvailable ? "checked" : ""} ${state.isAdding ? "disabled" : ""}>
                 <span>我已自行确认该品牌名可用，且不存在我已知的商标/品牌冲突。</span>
               </label>
               <p class="helper-line">可输入裸域名或 URL；.com 归国内候选，其它后缀归海外候选。</p>
-              <p class="add-status ${state.addStatus ? "is-error" : ""}" id="addDomainStatus">${escapeHtml(state.addStatus)}</p>
+              <p class="add-status ${state.addTone ? `is-${state.addTone}` : ""}" id="addDomainStatus">${escapeHtml(state.addStatus)}</p>
             </form>
           </div>
         </article>
@@ -1098,8 +1184,14 @@
         <div class="pick-row"><span>海外 #${index + 1}</span><strong>${escapeHtml(groupChoices("overseas")[index] || "未选择")}</strong></div>
       `).join("");
       pickBox.innerHTML = domesticRows + overseasRows;
-      submitVote.disabled = allChoices().length === 0;
-      voteStatus.textContent = state.voteStatus || `国内 ${groupChoices("domestic").length}/3，海外 ${groupChoices("overseas").length}/3`;
+      voterInput.value = state.voterKey;
+      submitVote.disabled = allChoices().length === 0 || !validVoterKey(state.voterKey) || state.isSubmitting;
+      submitVote.classList.toggle("is-busy", state.isSubmitting);
+      submitVote.textContent = state.isSubmitting ? "提交中..." : "提交投票";
+      voteStatus.className = `vote-status ${state.voteTone ? `is-${state.voteTone}` : ""}`;
+      voteStatus.textContent = state.voteStatus || (validVoterKey(state.voterKey)
+        ? `国内 ${groupChoices("domestic").length}/3，海外 ${groupChoices("overseas").length}/3`
+        : "请输入投票人标识后提交。");
       const topDomestic = sortedGroup("domestic").slice(0, 3);
       const topOverseas = sortedGroup("overseas").slice(0, 3);
       quickRanking.innerHTML = `
@@ -1124,27 +1216,13 @@
       renderSummary();
     }
 
-    function submitUrl() {
-      const payload = {
-        type: "brand-domain-vote",
-        version: 2,
+    function votePayload() {
+      return {
+        kind: "vote",
+        voterKey: normalizeVoterKey(state.voterKey),
         domestic: [...groupChoices("domestic")],
-        overseas: [...groupChoices("overseas")],
-        submittedAt: new Date().toISOString()
+        overseas: [...groupChoices("overseas")]
       };
-      const body = [
-        "Brand domain vote",
-        "",
-        "```json",
-        JSON.stringify(payload, null, 2),
-        "```"
-      ].join("\n");
-      const titleParts = allChoices().join(" + ");
-      const params = new URLSearchParams({
-        title: `Vote: ${titleParts}`,
-        body
-      });
-      return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
     }
 
     function celebrateVote() {
@@ -1172,29 +1250,66 @@
       window.setTimeout(() => layer.remove(), 1200);
     }
 
-    function addDomainUrl(brand, domain) {
-      const group = groupForDomain(domain);
-      const payload = {
-        type: "brand-domain-add",
-        version: 2,
-        brand,
-        domain,
-        group,
-        brandAvailableConfirmed: true,
-        submittedAt: new Date().toISOString()
-      };
-      const body = [
-        "Add brand domain candidate",
-        "",
-        "```json",
-        JSON.stringify(payload, null, 2),
-        "```"
-      ].join("\n");
-      const params = new URLSearchParams({
-        title: `Add domain: ${brand} / ${domain}`,
-        body
-      });
-      return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
+    async function submitVoteDirectly() {
+      if (state.isSubmitting) return;
+      const voterKey = normalizeVoterKey(state.voterKey);
+      state.voteStatus = "";
+      state.voteTone = "";
+      if (!validVoterKey(voterKey)) {
+        state.voteStatus = "请输入 2-80 个字符的投票人标识。";
+        state.voteTone = "error";
+        renderSummary();
+        return;
+      }
+      if (allChoices().length === 0) return;
+
+      state.voterKey = voterKey;
+      localStorage.setItem("brandVote.voterKey", voterKey);
+      state.isSubmitting = true;
+      state.voteStatus = "提交中...";
+      renderSummary();
+
+      try {
+        await postSubmission(votePayload());
+        celebrateVote();
+        state.voteStatus = "提交成功，榜单通常会在几十秒内刷新。";
+        state.voteTone = "success";
+      } catch (error) {
+        state.voteStatus = error.message || "提交失败，请稍后重试。";
+        state.voteTone = "error";
+      } finally {
+        state.isSubmitting = false;
+        renderSummary();
+      }
+    }
+
+    async function submitAddDomainDirectly(brand, domain) {
+      state.isAdding = true;
+      state.addStatus = "提交中...";
+      state.addTone = "";
+      render();
+
+      try {
+        await postSubmission({
+          kind: "add-domain",
+          brand,
+          domain,
+          brandAvailableConfirmed: true
+        });
+        state.addStatus = "已提交后台校验，通过后会自动进入候选池。";
+        state.addTone = "success";
+        state.addDraft = {
+          brand: "",
+          domain: "",
+          brandAvailable: false
+        };
+      } catch (error) {
+        state.addStatus = error.message || "提交失败，请稍后重试。";
+        state.addTone = "error";
+      } finally {
+        state.isAdding = false;
+        render();
+      }
     }
 
     document.addEventListener("click", (event) => {
@@ -1221,7 +1336,15 @@
       }
     });
 
-    document.addEventListener("submit", (event) => {
+    voterInput.addEventListener("input", () => {
+      state.voterKey = voterInput.value;
+      localStorage.setItem("brandVote.voterKey", state.voterKey);
+      state.voteStatus = "";
+      state.voteTone = "";
+      renderSummary();
+    });
+
+    document.addEventListener("submit", async (event) => {
       const form = event.target.closest("#addDomainForm");
       if (!form) return;
       event.preventDefault();
@@ -1230,36 +1353,43 @@
       const brandAvailable = form.querySelector("#brandAvailable");
       const brand = normalizeBrand(brandInput.value);
       const domain = normalizeDomain(input.value);
+      state.addDraft = {
+        brand,
+        domain,
+        brandAvailable: brandAvailable.checked
+      };
       state.addStatus = "";
+      state.addTone = "";
       if (!validBrand(brand)) {
         state.addStatus = "请输入有效品牌名，长度 2-80，可包含字母、数字、空格和 .&'_-。";
+        state.addTone = "error";
         render();
         return;
       }
       if (!validDomain(domain)) {
         state.addStatus = "请输入有效域名，例如 example.ai 或 example.com。";
+        state.addTone = "error";
         render();
         return;
       }
       if (hasCandidate(domain)) {
         state.addStatus = "这个域名已经在候选列表中，可以直接投票。";
+        state.addTone = "error";
         render();
         return;
       }
       if (!brandAvailable.checked) {
         state.addStatus = "请先确认品牌名可用。";
+        state.addTone = "error";
         render();
         return;
       }
-      window.open(addDomainUrl(brand, domain), "_blank", "noopener,noreferrer");
-      brandInput.value = brand;
-      input.value = domain;
+      await submitAddDomainDirectly(brand, domain);
     });
 
     submitVote.addEventListener("click", () => {
       if (submitVote.disabled) return;
-      celebrateVote();
-      window.open(submitUrl(), "_blank", "noopener,noreferrer");
+      submitVoteDirectly();
     });
 
     async function loadResults() {
