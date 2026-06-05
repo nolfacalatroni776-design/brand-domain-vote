@@ -236,6 +236,10 @@ function increment(group, domain) {
   group[domain].votes += 1;
 }
 
+function voteTimestamp(vote) {
+  return new Date(vote.submittedAt || vote.createdAt).getTime();
+}
+
 const issues = await fetchIssues();
 const domestic = [...baseDomestic];
 const overseas = [...baseOverseas];
@@ -262,7 +266,7 @@ for (const issue of issues) {
   if (!vote) continue;
   const voterKey = vote.voterId || vote.user;
   const previous = latestByUser.get(voterKey);
-  if (!previous || new Date(vote.createdAt) >= new Date(previous.createdAt)) {
+  if (!previous || voteTimestamp(vote) >= voteTimestamp(previous)) {
     latestByUser.set(voterKey, vote);
   }
 }
