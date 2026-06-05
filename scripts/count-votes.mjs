@@ -48,9 +48,11 @@ if (!token || !repository) {
 const headers = {
   "Accept": "application/vnd.github+json",
   "Authorization": `Bearer ${token}`,
+  "Content-Type": "application/json",
   "X-GitHub-Api-Version": "2022-11-28",
   "User-Agent": "brand-domain-vote-counter"
 };
+const rdapCache = new Map();
 
 async function fetchIssues() {
   const issues = [];
@@ -65,6 +67,52 @@ async function fetchIssues() {
     if (batch.length < 100) break;
   }
   return issues;
+}
+
+async function commentOnIssue(issue, message) {
+  if (!issue.comments_url) return;
+  const marker = "<!-- brand-domain-vote-check -->";
+  const existingResponse = await fetch(issue.comments_url, { headers });
+  const existing = existingResponse.ok ? await existingResponse.json() : [];
+  if (Array.isArray(existing) && existing.some((comment) => comment.body?.includes(marker))) return;
+
+  const response = await fetch(issue.comments_url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ body: `${marker}\n${message}` })
+  });
+  if (!response.ok) {
+    console.warn(`Unable to comment on issue ${issue.number}: ${response.status} ${await response.text()}`);
+  }
+}
+
+async function rdapEndpointFor(domain) {
+  const tld = domain.split(".").pop();
+  if (!tld) return null;
+  if (!rdapCache.has("bootstrap")) {
+    const response = await fetch("https://data.iana.org/rdap/dns.json", {
+      headers: { "Accept": "application/json", "User-Agent": "brand-domain-vote-counter" }
+    });
+    if (!response.ok) throw new Error(`IANA RDAP bootstrap failed: ${response.status}`);
+    rdapCache.set("bootstrap", await response.json());
+  }
+  const bootstrap = rdapCache.get("bootstrap");
+  const service = bootstrap.services?.find(([names]) => names.includes(tld));
+  const endpoint = service?.[1]?.[0];
+  return endpoint ? (endpoint.endsWith("/") ? endpoint : `${endpoint}/`) : null;
+}
+
+async function domainAvailability(domain) {
+  const endpoint = await rdapEndpointFor(domain);
+  if (!endpoint) {
+    return { ok: false, available: false, reason: `无法找到 .${domain.split(".").pop()} 的 RDAP 查询端点` };
+  }
+  const response = await fetch(`${endpoint}domain/${encodeURIComponent(domain)}`, {
+    headers: { "Accept": "application/rdap+json, application/json", "User-Agent": "brand-domain-vote-counter" }
+  });
+  if (response.status === 404) return { ok: true, available: true };
+  if (response.status === 200) return { ok: true, available: false, reason: "域名已注册" };
+  return { ok: false, available: false, reason: `RDAP 查询返回 ${response.status}` };
 }
 
 function normalizeDomain(value) {
@@ -83,6 +131,14 @@ function validDomain(domain) {
 
 function groupForDomain(domain) {
   return domain.endsWith(".com") ? "domestic" : "overseas";
+}
+
+function normalizeBrand(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function validBrand(brand) {
+  return /^[\p{L}\p{N}][\p{L}\p{N} .&'_-]{1,79}$/u.test(brand);
 }
 
 function extractPayload(issue, expectedType) {
@@ -106,18 +162,37 @@ function candidateMaps(domestic, overseas) {
   };
 }
 
-function parseAddDomain(issue, maps) {
+async function parseAddDomain(issue, maps) {
   if (!issue.title?.startsWith("Add domain:")) return null;
   const payload = extractPayload(issue, "brand-domain-add");
   if (!payload) return null;
 
+  const brand = normalizeBrand(payload.brand);
   const domain = normalizeDomain(payload.domain);
-  if (!validDomain(domain)) return null;
+  if (!validBrand(brand)) {
+    await commentOnIssue(issue, "新增域名未通过：品牌名格式无效。");
+    return null;
+  }
+  if (!payload.brandAvailableConfirmed) {
+    await commentOnIssue(issue, "新增域名未通过：提交时未确认品牌名可用。");
+    return null;
+  }
+  if (!validDomain(domain)) {
+    await commentOnIssue(issue, "新增域名未通过：域名格式无效。");
+    return null;
+  }
 
   const group = groupForDomain(domain);
   if (maps.domestic.has(domain) || maps.overseas.has(domain)) return null;
 
+  const availability = await domainAvailability(domain);
+  if (!availability.ok || !availability.available) {
+    await commentOnIssue(issue, `新增域名未通过：${availability.reason || "域名不可用"}。`);
+    return null;
+  }
+
   return {
+    brand,
     domain,
     group,
     user: issue.user?.login || "unknown",
@@ -132,14 +207,17 @@ function parseVote(issue, maps) {
   const payload = extractPayload(issue, "brand-domain-vote");
   if (!payload) return null;
 
-  const domestic = maps.domestic.get(normalizeDomain(payload.domestic));
-  const overseas = maps.overseas.get(normalizeDomain(payload.overseas));
-  if (!domestic || !overseas) return null;
+  const domesticPayload = Array.isArray(payload.domestic) ? payload.domestic : [payload.domestic];
+  const overseasPayload = Array.isArray(payload.overseas) ? payload.overseas : [payload.overseas];
+  const domestic = [...new Set(domesticPayload.map((domain) => maps.domestic.get(normalizeDomain(domain))).filter(Boolean))].slice(0, 3);
+  const overseas = [...new Set(overseasPayload.map((domain) => maps.overseas.get(normalizeDomain(domain))).filter(Boolean))].slice(0, 3);
+  if (domestic.length + overseas.length === 0) return null;
 
   return {
     user: issue.user?.login || "unknown",
     domestic,
     overseas,
+    choices: [...domestic, ...overseas],
     issue: issue.html_url,
     createdAt: issue.created_at,
     submittedAt: payload.submittedAt || issue.created_at
@@ -162,7 +240,7 @@ const maps = candidateMaps(domestic, overseas);
 const addedDomains = [];
 
 for (const issue of issues) {
-  const added = parseAddDomain(issue, maps);
+  const added = await parseAddDomain(issue, maps);
   if (!added) continue;
   addedDomains.push(added);
   if (added.group === "domestic") {
@@ -196,8 +274,8 @@ const result = {
 };
 
 for (const vote of votes) {
-  increment(result.domestic, vote.domestic);
-  increment(result.overseas, vote.overseas);
+  for (const domain of vote.domestic) increment(result.domestic, domain);
+  for (const domain of vote.overseas) increment(result.overseas, domain);
 }
 
 await writeFile("data/results.json", `${JSON.stringify(result, null, 2)}\n`);

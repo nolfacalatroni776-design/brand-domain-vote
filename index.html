@@ -39,6 +39,7 @@
 
     button,
     form,
+    label,
     input {
       font: inherit;
     }
@@ -199,6 +200,48 @@
     .ticket-list {
       display: grid;
       gap: 18px;
+      max-height: min(74vh, 900px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 125, 85, 0.55) rgba(255, 255, 255, 0.22);
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      margin: 0 4px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(251, 250, 247, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+
+    .filter-input {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 16px;
+      outline: none;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .filter-input:focus {
+      border-color: var(--coral);
+      box-shadow: 0 0 0 4px rgba(255, 125, 85, 0.13);
+    }
+
+    .filter-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 84px;
+      color: var(--muted);
+      font-size: 14px;
     }
 
     .ticket {
@@ -360,6 +403,52 @@
       color: white;
     }
 
+    .vote-status {
+      margin: 12px 0 0;
+      min-height: 20px;
+      color: var(--coral-dark);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .confetti-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .confetti-piece {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      width: 8px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--c);
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: confetti-pop 980ms cubic-bezier(0.16, 0.82, 0.24, 1) forwards;
+      animation-delay: var(--delay);
+    }
+
+    @keyframes confetti-pop {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(0deg) scale(0.72);
+      }
+
+      72% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1);
+      }
+    }
+
     .add-ticket .ticket-body {
       grid-template-columns: 1fr;
     }
@@ -428,6 +517,27 @@
 
     .add-status.is-error {
       color: #b94a36;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .check-row input {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--coral);
+      flex: 0 0 18px;
     }
 
     .check {
@@ -568,6 +678,10 @@
         position: static;
         order: -1;
       }
+
+      .ticket-list {
+        max-height: 68vh;
+      }
     }
 
     @media (max-width: 680px) {
@@ -636,6 +750,14 @@
         width: 100%;
         min-width: 0;
       }
+
+      .filter-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-count {
+        justify-content: flex-start;
+      }
     }
   </style>
 </head>
@@ -645,7 +767,7 @@
       <div class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></div>
       <div class="title-block">
         <h1>Domain Vote</h1>
-        <p>每人选择 1 个国内 .com 和 1 个海外域名</p>
+        <p>国内最多 3 票，海外最多 3 票，可分次提交修改</p>
       </div>
       <div class="pill">Brand shortlist <span class="pin" aria-hidden="true"></span></div>
     </header>
@@ -661,19 +783,21 @@
       <div class="panel">
         <div class="section-title">
           <h2 id="listTitle">.com 国内</h2>
-          <span id="listHint">选择 1 个面向国内传播的 .com 域名</span>
+          <span id="listHint">国内 .com 最多 3 票，可分次提交修改</span>
+        </div>
+        <div class="filter-bar" id="filterBar">
+          <input class="filter-input" id="filterInput" type="search" autocomplete="off" placeholder="搜索域名">
+          <span class="filter-count" id="filterCount">0 domains</span>
         </div>
         <div class="ticket-list" id="ticketList"></div>
       </div>
 
       <aside class="summary" aria-label="投票汇总">
         <h2>My Vote</h2>
-        <div class="pick-box">
-          <div class="pick-row"><span>国内</span><strong id="domesticPick">未选择</strong></div>
-          <div class="pick-row"><span>海外</span><strong id="overseasPick">未选择</strong></div>
-        </div>
+        <div class="pick-box" id="pickBox"></div>
         <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
-        <p class="note">提交会打开 GitHub issue。统计按 GitHub 用户去重，取每个用户最后一次有效投票。</p>
+        <p class="vote-status" id="voteStatus"></p>
+        <p class="note">提交会打开 GitHub issue。每组最多 3 票，可以只提交 1 票或 2 票；统计按 GitHub 用户去重，取最后一次有效提交。</p>
 
         <div class="leaderboard" id="quickRanking"></div>
       </aside>
@@ -683,6 +807,7 @@
   <script>
     const REPO_OWNER = "nolfacalatroni776-design";
     const REPO_NAME = "brand-domain-vote";
+    const MAX_VOTES_PER_GROUP = 3;
 
     const baseDomestic = [
       "KunlunGround.com",
@@ -723,23 +848,44 @@
     ];
 
     const palette = ["#f3c500", "#22bca7", "#9b58bd", "#ff7d55", "#5aa9e6", "#ef5c6e"];
+    function storedGroup(key, legacyKey) {
+      const raw = localStorage.getItem(key);
+      try {
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).slice(0, MAX_VOTES_PER_GROUP);
+      } catch {
+        const legacy = localStorage.getItem(legacyKey);
+        return legacy ? [legacy] : [];
+      }
+      const legacy = localStorage.getItem(legacyKey);
+      return legacy ? [legacy] : [];
+    }
+
     const state = {
       view: "domestic",
       picks: {
-        domestic: localStorage.getItem("brandVote.domestic") || "",
-        overseas: localStorage.getItem("brandVote.overseas") || ""
+        domestic: storedGroup("brandVote.domesticChoices", "brandVote.domestic"),
+        overseas: storedGroup("brandVote.overseasChoices", "brandVote.overseas")
       },
       results: null,
-      addStatus: ""
+      addStatus: "",
+      voteStatus: "",
+      filters: {
+        domestic: "",
+        overseas: ""
+      }
     };
 
     const ticketList = document.getElementById("ticketList");
-    const domesticPick = document.getElementById("domesticPick");
-    const overseasPick = document.getElementById("overseasPick");
+    const pickBox = document.getElementById("pickBox");
     const submitVote = document.getElementById("submitVote");
+    const voteStatus = document.getElementById("voteStatus");
     const quickRanking = document.getElementById("quickRanking");
     const listTitle = document.getElementById("listTitle");
     const listHint = document.getElementById("listHint");
+    const filterBar = document.getElementById("filterBar");
+    const filterInput = document.getElementById("filterInput");
+    const filterCount = document.getElementById("filterCount");
 
     function candidates(group) {
       const base = group === "domestic" ? baseDomestic : baseOverseas;
@@ -760,6 +906,14 @@
       return domain.endsWith(".com") ? "domestic" : "overseas";
     }
 
+    function normalizeBrand(value) {
+      return String(value || "").trim().replace(/\s+/g, " ");
+    }
+
+    function validBrand(brand) {
+      return /^[\p{L}\p{N}][\p{L}\p{N} .&'_-]{1,79}$/u.test(brand);
+    }
+
     function validDomain(domain) {
       return /^(?=.{4,253}$)(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/i.test(domain)
         && !domain.split(".").some((part) => part.startsWith("-") || part.endsWith("-"));
@@ -769,6 +923,41 @@
       const normalized = domain.toLowerCase();
       return [...candidates("domestic"), ...candidates("overseas")]
         .some((candidate) => candidate.toLowerCase() === normalized);
+    }
+
+    function groupChoices(group) {
+      return state.picks[group] || [];
+    }
+
+    function allChoices() {
+      return [...groupChoices("domestic"), ...groupChoices("overseas")];
+    }
+
+    function isSelected(group, domain) {
+      const normalized = domain.toLowerCase();
+      return groupChoices(group).some((choice) => choice.toLowerCase() === normalized);
+    }
+
+    function persistChoices(group) {
+      localStorage.setItem(`brandVote.${group}Choices`, JSON.stringify(groupChoices(group)));
+    }
+
+    function toggleChoice(group, domain) {
+      const choices = groupChoices(group);
+      const normalized = domain.toLowerCase();
+      const index = choices.findIndex((choice) => choice.toLowerCase() === normalized);
+      state.voteStatus = "";
+      if (index >= 0) {
+        choices.splice(index, 1);
+        persistChoices(group);
+        return;
+      }
+      if (choices.length >= MAX_VOTES_PER_GROUP) {
+        state.voteStatus = `${group === "domestic" ? "国内" : "海外"}已选满 3 票。取消一个已选域名后可以修改。`;
+        return;
+      }
+      choices.push(domain);
+      persistChoices(group);
     }
 
     function escapeHtml(value) {
@@ -788,12 +977,18 @@
     function renderTickets() {
       const isDomestic = state.view === "domestic";
       const group = isDomestic ? "domestic" : "overseas";
-      const items = candidates(group);
+      const allItems = candidates(group);
+      const query = state.filters[group].trim().toLowerCase();
+      const items = query ? allItems.filter((domain) => domain.toLowerCase().includes(query)) : allItems;
       listTitle.textContent = isDomestic ? ".com 国内" : "海外域名";
-      listHint.textContent = isDomestic ? "选择 1 个面向国内传播的 .com 域名" : "选择 1 个面向海外传播的非 .com 域名";
+      listHint.textContent = isDomestic ? "国内 .com 最多 3 票，可分次提交修改" : "海外域名最多 3 票，可分次提交修改";
+      filterBar.classList.remove("hidden");
+      filterInput.value = state.filters[group];
+      filterInput.placeholder = isDomestic ? "搜索国内 .com 域名" : "搜索海外域名";
+      filterCount.textContent = `${items.length}/${allItems.length} 个域名`;
 
-      ticketList.innerHTML = items.map((domain, index) => {
-        const selected = state.picks[group] === domain;
+      ticketList.innerHTML = (items.length ? items.map((domain, index) => {
+        const selected = isSelected(group, domain);
         const color = palette[index % palette.length];
         const voteCount = votesFor(group, domain);
         const safeDomain = escapeHtml(domain);
@@ -823,7 +1018,7 @@
             </div>
           </article>
         `;
-      }).join("");
+      }).join("") : `<div class="rank-card"><div class="rank-no">0</div><div class="rank-name">没有匹配域名</div><div class="rank-votes"></div></div>`);
     }
 
     function sortedGroup(group) {
@@ -842,6 +1037,7 @@
     function renderRanking() {
       listTitle.textContent = "榜单";
       listHint.textContent = `累计 ${state.results?.totalVoters || 0} 位 GitHub 用户有效投票`;
+      filterBar.classList.add("hidden");
       const blocks = [
         ["domestic", ".com 国内排名"],
         ["overseas", "海外域名排名"]
@@ -856,7 +1052,7 @@
       return `
         <div class="rank-card">
           <div class="rank-no">${index + 1}</div>
-          <div class="rank-name">${item.domain}</div>
+          <div class="rank-name">${escapeHtml(item.domain)}</div>
           <div class="rank-votes">${item.votes} votes</div>
         </div>
       `;
@@ -864,22 +1060,29 @@
 
     function renderAddDomain() {
       listTitle.textContent = "添加域名";
-      listHint.textContent = "提交后由 GitHub Actions 合并，随后即可参与投票";
+      listHint.textContent = "提交后先自动校验域名注册状态，通过后合并";
+      filterBar.classList.add("hidden");
       ticketList.innerHTML = `
         <article class="ticket add-ticket" style="--stub:#22bca7">
           <div class="stub"><div class="stub-label">ADD</div></div>
           <div class="ticket-body">
             <div class="ticket-main">
               <h3 class="domain">Add a domain</h3>
-              <p class="add-copy">新增域名会按后缀自动分组：.com 进入国内候选，其它后缀进入海外候选。提交后会打开 GitHub issue，统计任务处理后页面会自动显示新候选。</p>
+              <p class="add-copy">系统会用 RDAP 自动检查域名是否已注册；品牌可用性由提交人自行确认。域名已注册、无法查询或未确认品牌可用时，不会合并进候选池。</p>
             </div>
             <form class="add-form" id="addDomainForm">
+              <label class="field-label" for="brandInput">品牌名</label>
+              <input class="domain-input" id="brandInput" name="brand" type="text" autocomplete="off" placeholder="FreshBrand" value="">
               <label class="field-label" for="domainInput">域名</label>
               <div class="domain-input-row">
                 <input class="domain-input" id="domainInput" name="domain" type="text" inputmode="url" autocomplete="off" placeholder="example.ai 或 example.com" value="">
                 <button class="submit-btn add-btn" type="submit">添加域名</button>
               </div>
-              <p class="helper-line">可输入裸域名或 URL；系统会去掉 https://、www. 和路径。</p>
+              <label class="check-row" for="brandAvailable">
+                <input id="brandAvailable" name="brandAvailable" type="checkbox">
+                <span>我已自行确认该品牌名可用，且不存在我已知的商标/品牌冲突。</span>
+              </label>
+              <p class="helper-line">可输入裸域名或 URL；.com 归国内候选，其它后缀归海外候选。</p>
               <p class="add-status ${state.addStatus ? "is-error" : ""}" id="addDomainStatus">${escapeHtml(state.addStatus)}</p>
             </form>
           </div>
@@ -888,9 +1091,15 @@
     }
 
     function renderSummary() {
-      domesticPick.textContent = state.picks.domestic || "未选择";
-      overseasPick.textContent = state.picks.overseas || "未选择";
-      submitVote.disabled = !(state.picks.domestic && state.picks.overseas);
+      const domesticRows = Array.from({ length: MAX_VOTES_PER_GROUP }, (_, index) => `
+        <div class="pick-row"><span>国内 #${index + 1}</span><strong>${escapeHtml(groupChoices("domestic")[index] || "未选择")}</strong></div>
+      `).join("");
+      const overseasRows = Array.from({ length: MAX_VOTES_PER_GROUP }, (_, index) => `
+        <div class="pick-row"><span>海外 #${index + 1}</span><strong>${escapeHtml(groupChoices("overseas")[index] || "未选择")}</strong></div>
+      `).join("");
+      pickBox.innerHTML = domesticRows + overseasRows;
+      submitVote.disabled = allChoices().length === 0;
+      voteStatus.textContent = state.voteStatus || `国内 ${groupChoices("domestic").length}/3，海外 ${groupChoices("overseas").length}/3`;
       const topDomestic = sortedGroup("domestic").slice(0, 3);
       const topOverseas = sortedGroup("overseas").slice(0, 3);
       quickRanking.innerHTML = `
@@ -918,9 +1127,9 @@
     function submitUrl() {
       const payload = {
         type: "brand-domain-vote",
-        version: 1,
-        domestic: state.picks.domestic,
-        overseas: state.picks.overseas,
+        version: 2,
+        domestic: [...groupChoices("domestic")],
+        overseas: [...groupChoices("overseas")],
         submittedAt: new Date().toISOString()
       };
       const body = [
@@ -930,20 +1139,48 @@
         JSON.stringify(payload, null, 2),
         "```"
       ].join("\n");
+      const titleParts = allChoices().join(" + ");
       const params = new URLSearchParams({
-        title: `Vote: ${state.picks.domestic} + ${state.picks.overseas}`,
+        title: `Vote: ${titleParts}`,
         body
       });
       return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
     }
 
-    function addDomainUrl(domain) {
+    function celebrateVote() {
+      const rect = submitVote.getBoundingClientRect();
+      const originX = `${rect.left + rect.width / 2}px`;
+      const originY = `${rect.top + rect.height / 2}px`;
+      const layer = document.createElement("div");
+      layer.className = "confetti-layer";
+      const colors = ["#ff7d55", "#22bca7", "#f3c500", "#9b58bd", "#5aa9e6", "#ef5c6e"];
+      for (let index = 0; index < 64; index += 1) {
+        const piece = document.createElement("span");
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 80 + Math.random() * 190;
+        piece.className = "confetti-piece";
+        piece.style.setProperty("--x", originX);
+        piece.style.setProperty("--y", originY);
+        piece.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+        piece.style.setProperty("--dy", `${Math.sin(angle) * distance - 120}px`);
+        piece.style.setProperty("--rot", `${Math.round(Math.random() * 720 - 360)}deg`);
+        piece.style.setProperty("--delay", `${Math.random() * 90}ms`);
+        piece.style.setProperty("--c", colors[index % colors.length]);
+        layer.appendChild(piece);
+      }
+      document.body.appendChild(layer);
+      window.setTimeout(() => layer.remove(), 1200);
+    }
+
+    function addDomainUrl(brand, domain) {
       const group = groupForDomain(domain);
       const payload = {
         type: "brand-domain-add",
-        version: 1,
+        version: 2,
+        brand,
         domain,
         group,
+        brandAvailableConfirmed: true,
         submittedAt: new Date().toISOString()
       };
       const body = [
@@ -954,7 +1191,7 @@
         "```"
       ].join("\n");
       const params = new URLSearchParams({
-        title: `Add domain: ${domain}`,
+        title: `Add domain: ${brand} / ${domain}`,
         body
       });
       return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
@@ -972,9 +1209,15 @@
       if (button) {
         const group = button.dataset.group;
         const domain = button.dataset.domain;
-        state.picks[group] = domain;
-        localStorage.setItem(`brandVote.${group}`, domain);
+        toggleChoice(group, domain);
         render();
+      }
+    });
+
+    filterInput.addEventListener("input", () => {
+      if (state.view === "domestic" || state.view === "overseas") {
+        state.filters[state.view] = filterInput.value;
+        renderTickets();
       }
     });
 
@@ -982,9 +1225,17 @@
       const form = event.target.closest("#addDomainForm");
       if (!form) return;
       event.preventDefault();
+      const brandInput = form.querySelector("#brandInput");
       const input = form.querySelector("#domainInput");
+      const brandAvailable = form.querySelector("#brandAvailable");
+      const brand = normalizeBrand(brandInput.value);
       const domain = normalizeDomain(input.value);
       state.addStatus = "";
+      if (!validBrand(brand)) {
+        state.addStatus = "请输入有效品牌名，长度 2-80，可包含字母、数字、空格和 .&'_-。";
+        render();
+        return;
+      }
       if (!validDomain(domain)) {
         state.addStatus = "请输入有效域名，例如 example.ai 或 example.com。";
         render();
@@ -995,12 +1246,19 @@
         render();
         return;
       }
-      window.open(addDomainUrl(domain), "_blank", "noopener,noreferrer");
+      if (!brandAvailable.checked) {
+        state.addStatus = "请先确认品牌名可用。";
+        render();
+        return;
+      }
+      window.open(addDomainUrl(brand, domain), "_blank", "noopener,noreferrer");
+      brandInput.value = brand;
       input.value = domain;
     });
 
     submitVote.addEventListener("click", () => {
       if (submitVote.disabled) return;
+      celebrateVote();
       window.open(submitUrl(), "_blank", "noopener,noreferrer");
     });
 
