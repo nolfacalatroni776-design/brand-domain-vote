@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-05T05:22:40.325Z",
-  "totalVoters": 1,
+  "generatedAt": "2026-06-05T05:39:04.650Z",
+  "totalVoters": 2,
   "domestic": {
     "KunlunGround.com": {
       "votes": 1
@@ -9,7 +9,7 @@
       "votes": 0
     },
     "annocrew.com": {
-      "votes": 0
+      "votes": 1
     },
     "crowdAnno.com": {
       "votes": 0
@@ -104,8 +104,24 @@
   "addedDomains": [],
   "votes": [
     {
+      "voterId": "c306653202b00954ac24e19acf4d17747b29a33fbb4e547e1fb1afdba8b320c0",
+      "user": "nolfacalatroni776-design",
+      "clear": false,
+      "domestic": [
+        "annocrew.com"
+      ],
+      "overseas": [],
+      "choices": [
+        "annocrew.com"
+      ],
+      "issue": "https://github.com/nolfacalatroni776-design/brand-domain-vote/issues/7",
+      "createdAt": "2026-06-05T05:38:51Z",
+      "submittedAt": "2026-06-05T05:38:51.636Z"
+    },
+    {
       "voterId": "fc071081fe81a2694cafb59e0aec1cea4f22bcb9d8d5222a281bd79a95377102",
       "user": "nolfacalatroni776-design",
+      "clear": false,
       "domestic": [
         "KunlunGround.com"
       ],
