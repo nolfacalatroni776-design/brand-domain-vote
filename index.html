@@ -841,7 +841,7 @@
         </label>
         <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
         <p class="vote-status" id="voteStatus"></p>
-        <p class="note">提交后会直接记录，榜单通常几十秒内刷新。每组最多 3 票，可以只提交 1 票或 2 票；统计按投票人标识去重，取最后一次有效提交。</p>
+        <p class="note">提交后会直接记录并刷新榜单。每组最多 3 票，可以只提交 1 票或 2 票；统计按投票人标识去重，取最后一次有效提交。</p>
 
         <div class="leaderboard" id="quickRanking"></div>
       </aside>
@@ -1037,6 +1037,27 @@
 
     function votesFor(group, domain) {
       return state.results?.[group]?.[domain]?.votes || 0;
+    }
+
+    function normalizeResult(result) {
+      const fallback = {
+        generatedAt: null,
+        totalVoters: 0,
+        domestic: {},
+        overseas: {},
+        addedDomains: []
+      };
+      const normalized = result && typeof result === "object" ? result : fallback;
+      normalized.domestic ||= {};
+      normalized.overseas ||= {};
+      normalized.addedDomains ||= [];
+      for (const domain of baseDomestic) {
+        normalized.domestic[domain] ||= { votes: 0 };
+      }
+      for (const domain of baseOverseas) {
+        normalized.overseas[domain] ||= { votes: 0 };
+      }
+      return normalized;
     }
 
     function apiEndpoint() {
@@ -1270,9 +1291,13 @@
       renderSummary();
 
       try {
-        await postSubmission(votePayload());
+        const data = await postSubmission(votePayload());
+        if (data.result) {
+          state.results = normalizeResult(data.result);
+          render();
+        }
         celebrateVote();
-        state.voteStatus = "提交成功，榜单通常会在几十秒内刷新。";
+        state.voteStatus = data.result ? "提交成功，榜单已刷新。" : "提交成功，榜单稍后刷新。";
         state.voteTone = "success";
       } catch (error) {
         state.voteStatus = error.message || "提交失败，请稍后重试。";
@@ -1396,21 +1421,15 @@
       try {
         const response = await fetch("data/results.json", { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        state.results = await response.json();
+        state.results = normalizeResult(await response.json());
       } catch {
-        state.results = {
+        state.results = normalizeResult({
           generatedAt: null,
           totalVoters: 0,
           domestic: Object.fromEntries(baseDomestic.map((domain) => [domain, { votes: 0 }])),
           overseas: Object.fromEntries(baseOverseas.map((domain) => [domain, { votes: 0 }])),
           addedDomains: []
-        };
-      }
-      for (const group of ["domestic", "overseas"]) {
-        state.results[group] ||= {};
-        for (const domain of group === "domestic" ? baseDomestic : baseOverseas) {
-          state.results[group][domain] ||= { votes: 0 };
-        }
+        });
       }
       render();
     }

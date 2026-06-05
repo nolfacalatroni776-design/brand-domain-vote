@@ -134,21 +134,33 @@ function mapCandidates(domestic, overseas) {
 async function fetchCandidates() {
   const domestic = [...baseDomestic];
   const overseas = [...baseOverseas];
+  const current = await fetchCurrentResults();
+  domestic.push(...Object.keys(current.domestic || {}));
+  overseas.push(...Object.keys(current.overseas || {}));
+  return {
+    domestic: [...new Set(domestic)],
+    overseas: [...new Set(overseas)]
+  };
+}
+
+async function fetchCurrentResults() {
   try {
     const response = await fetch("https://nolfacalatroni776-design.github.io/brand-domain-vote/data/results.json", {
       cache: "no-store"
     });
     if (response.ok) {
-      const data = await response.json();
-      domestic.push(...Object.keys(data.domestic || {}));
-      overseas.push(...Object.keys(data.overseas || {}));
+      return await response.json();
     }
   } catch {
-    // Base candidates are enough for initial submissions if the public result file is unavailable.
+    // Rebuild from base candidates if the public result file is unavailable.
   }
   return {
-    domestic: [...new Set(domestic)],
-    overseas: [...new Set(overseas)]
+    generatedAt: null,
+    totalVoters: 0,
+    domestic: Object.fromEntries(baseDomestic.map((domain) => [domain, { votes: 0 }])),
+    overseas: Object.fromEntries(baseOverseas.map((domain) => [domain, { votes: 0 }])),
+    addedDomains: [],
+    votes: []
   };
 }
 
@@ -189,6 +201,53 @@ function issueBody(title, payload) {
     JSON.stringify(payload, null, 2),
     "```"
   ].join("\n");
+}
+
+function emptyCounts(items) {
+  return Object.fromEntries(items.map((domain) => [domain, { votes: 0 }]));
+}
+
+function increment(group, domain) {
+  group[domain] ||= { votes: 0 };
+  group[domain].votes += 1;
+}
+
+async function resultWithVote(payload, createdIssue) {
+  const current = await fetchCurrentResults();
+  const domesticCandidates = [...new Set([...baseDomestic, ...Object.keys(current.domestic || {})])];
+  const overseasCandidates = [...new Set([...baseOverseas, ...Object.keys(current.overseas || {})])];
+  const voterKey = payload.voterId;
+  const votes = (Array.isArray(current.votes) ? current.votes : [])
+    .filter((vote) => (vote.voterId || vote.user) !== voterKey);
+  const createdAt = createdIssue.created_at || payload.submittedAt;
+  votes.push({
+    voterId: payload.voterId,
+    user: "api",
+    domestic: payload.domestic,
+    overseas: payload.overseas,
+    choices: [...payload.domestic, ...payload.overseas],
+    issue: createdIssue.html_url,
+    createdAt,
+    submittedAt: payload.submittedAt
+  });
+  votes.sort((a, b) => (a.user || "").localeCompare(b.user || "") || String(a.voterId || "").localeCompare(String(b.voterId || "")));
+
+  const result = {
+    generatedAt: new Date().toISOString(),
+    totalVoters: votes.length,
+    domestic: emptyCounts(domesticCandidates),
+    overseas: emptyCounts(overseasCandidates),
+    addedDomains: Array.isArray(current.addedDomains) ? current.addedDomains : [],
+    votes,
+    realtime: true
+  };
+
+  for (const vote of votes) {
+    for (const domain of Array.isArray(vote.domestic) ? vote.domestic : []) increment(result.domestic, domain);
+    for (const domain of Array.isArray(vote.overseas) ? vote.overseas : []) increment(result.overseas, domain);
+  }
+
+  return result;
 }
 
 async function createIssue(title, body) {
@@ -244,7 +303,8 @@ async function buildVoteIssue(input) {
   };
   return {
     title: `Vote: ${voterId.slice(0, 12)}`,
-    body: issueBody("Brand domain vote", payload)
+    body: issueBody("Brand domain vote", payload),
+    payload
   };
 }
 
@@ -285,7 +345,8 @@ async function buildAddDomainIssue(input) {
   };
   return {
     title: `Add domain: ${brand} / ${domain}`,
-    body: issueBody("Add brand domain candidate", payload)
+    body: issueBody("Add brand domain candidate", payload),
+    payload
   };
 }
 
@@ -323,10 +384,12 @@ export default async function handler(req, res) {
     }
 
     const created = await createIssue(issue.title, issue.body);
+    const result = input.kind === "add-domain" ? null : await resultWithVote(issue.payload, created);
     sendJson(res, 200, {
       ok: true,
       issueNumber: created.number,
-      issueUrl: created.html_url
+      issueUrl: created.html_url,
+      result
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "提交失败，请稍后重试。";
