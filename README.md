@@ -8,6 +8,8 @@ Static GitHub Pages voting page for domain shortlist selection.
 - The page opens a prefilled GitHub issue for submission.
 - GitHub Actions scans `Vote:` issues, deduplicates by GitHub username, and keeps the latest valid vote from each user.
 - Aggregated results are written to `data/results.json` and read by the page.
+- Users can submit new candidate domains from the Add tab. The page opens an `Add domain:` issue, and GitHub Actions merges valid additions into `data/results.json`.
+- Added `.com` domains are grouped as domestic candidates. Added non-`.com` domains are grouped as overseas candidates.
 
 ## Candidate groups
 

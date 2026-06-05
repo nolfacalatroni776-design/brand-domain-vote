@@ -38,8 +38,13 @@
     }
 
     button,
+    form,
     input {
       font: inherit;
+    }
+
+    form {
+      margin: 0;
     }
 
     .app {
@@ -128,7 +133,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       margin: 26px clamp(16px, 4vw, 34px) 22px;
       border: 2px solid var(--coral);
       border-radius: 11px;
@@ -355,6 +360,76 @@
       color: white;
     }
 
+    .add-ticket .ticket-body {
+      grid-template-columns: 1fr;
+    }
+
+    .add-copy {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .add-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field-label {
+      display: block;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .domain-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .domain-input {
+      width: 100%;
+      min-height: 58px;
+      padding: 0 20px;
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+      font-size: 17px;
+    }
+
+    .domain-input:focus {
+      border-color: var(--coral);
+      box-shadow: 0 0 0 4px rgba(255, 125, 85, 0.14);
+    }
+
+    .add-btn {
+      width: auto;
+      min-width: 148px;
+      padding: 0 24px;
+      box-shadow: none;
+    }
+
+    .helper-line,
+    .add-status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .add-status {
+      min-height: 20px;
+    }
+
+    .add-status.is-error {
+      color: #b94a36;
+    }
+
     .check {
       display: grid;
       place-items: center;
@@ -524,7 +599,7 @@
       .tab {
         min-height: 52px;
         padding: 0 6px;
-        font-size: 16px;
+        font-size: 15px;
         white-space: nowrap;
       }
 
@@ -552,6 +627,15 @@
         width: 100%;
         min-width: 0;
       }
+
+      .domain-input-row {
+        grid-template-columns: 1fr;
+      }
+
+      .add-btn {
+        width: 100%;
+        min-width: 0;
+      }
     }
   </style>
 </head>
@@ -569,6 +653,7 @@
     <nav class="tabs" aria-label="投票视图">
       <button class="tab is-active" type="button" data-view="domestic">.com 国内</button>
       <button class="tab" type="button" data-view="overseas">海外域名</button>
+      <button class="tab" type="button" data-view="add">添加</button>
       <button class="tab" type="button" data-view="ranking">榜单</button>
     </nav>
 
@@ -599,14 +684,14 @@
     const REPO_OWNER = "nolfacalatroni776-design";
     const REPO_NAME = "brand-domain-vote";
 
-    const domestic = [
+    const baseDomestic = [
       "KunlunGround.com",
       "OrbitTasker.com",
       "annocrew.com",
       "crowdAnno.com"
     ];
 
-    const overseas = [
+    const baseOverseas = [
       "humanbench.ai",
       "crowdbench.ai",
       "omnitruth.ai",
@@ -644,7 +729,8 @@
         domestic: localStorage.getItem("brandVote.domestic") || "",
         overseas: localStorage.getItem("brandVote.overseas") || ""
       },
-      results: null
+      results: null,
+      addStatus: ""
     };
 
     const ticketList = document.getElementById("ticketList");
@@ -655,14 +741,54 @@
     const listTitle = document.getElementById("listTitle");
     const listHint = document.getElementById("listHint");
 
+    function candidates(group) {
+      const base = group === "domestic" ? baseDomestic : baseOverseas;
+      const resultItems = Object.keys(state.results?.[group] || {});
+      return [...new Set([...base, ...resultItems])];
+    }
+
+    function normalizeDomain(value) {
+      return String(value || "")
+        .trim()
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .replace(/\/.*$/, "")
+        .toLowerCase();
+    }
+
+    function groupForDomain(domain) {
+      return domain.endsWith(".com") ? "domestic" : "overseas";
+    }
+
+    function validDomain(domain) {
+      return /^(?=.{4,253}$)(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/i.test(domain)
+        && !domain.split(".").some((part) => part.startsWith("-") || part.endsWith("-"));
+    }
+
+    function hasCandidate(domain) {
+      const normalized = domain.toLowerCase();
+      return [...candidates("domestic"), ...candidates("overseas")]
+        .some((candidate) => candidate.toLowerCase() === normalized);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
     function votesFor(group, domain) {
       return state.results?.[group]?.[domain]?.votes || 0;
     }
 
     function renderTickets() {
       const isDomestic = state.view === "domestic";
-      const items = isDomestic ? domestic : overseas;
       const group = isDomestic ? "domestic" : "overseas";
+      const items = candidates(group);
       listTitle.textContent = isDomestic ? ".com 国内" : "海外域名";
       listHint.textContent = isDomestic ? "选择 1 个面向国内传播的 .com 域名" : "选择 1 个面向海外传播的非 .com 域名";
 
@@ -670,12 +796,13 @@
         const selected = state.picks[group] === domain;
         const color = palette[index % palette.length];
         const voteCount = votesFor(group, domain);
+        const safeDomain = escapeHtml(domain);
         return `
           <article class="ticket" style="--stub:${color}">
             <div class="stub"><div class="stub-label">#${index + 1}</div></div>
             <div class="ticket-body">
               <div class="ticket-main">
-                <h3 class="domain">${domain}</h3>
+                <h3 class="domain">${safeDomain}</h3>
                 <div class="meta-row">
                   <svg class="mini-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                   <span>${isDomestic ? "Domestic .com ballot" : "Overseas ballot"}</span>
@@ -688,7 +815,7 @@
               </div>
               <div class="ticket-action">
                 <div class="votes">Rank ${rankFor(group, domain) || "-"}</div>
-                <button class="select-btn ${selected ? "is-selected" : ""}" type="button" data-group="${group}" data-domain="${domain}">
+                <button class="select-btn ${selected ? "is-selected" : ""}" type="button" data-group="${group}" data-domain="${safeDomain}">
                   <span class="check" aria-hidden="true"></span>
                   ${selected ? "SELECTED" : "VOTE"}
                 </button>
@@ -700,7 +827,7 @@
     }
 
     function sortedGroup(group) {
-      const items = group === "domestic" ? domestic : overseas;
+      const items = candidates(group);
       return items
         .map((domain) => ({ domain, votes: votesFor(group, domain) }))
         .sort((a, b) => b.votes - a.votes || a.domain.localeCompare(b.domain));
@@ -735,6 +862,31 @@
       `;
     }
 
+    function renderAddDomain() {
+      listTitle.textContent = "添加域名";
+      listHint.textContent = "提交后由 GitHub Actions 合并，随后即可参与投票";
+      ticketList.innerHTML = `
+        <article class="ticket add-ticket" style="--stub:#22bca7">
+          <div class="stub"><div class="stub-label">ADD</div></div>
+          <div class="ticket-body">
+            <div class="ticket-main">
+              <h3 class="domain">Add a domain</h3>
+              <p class="add-copy">新增域名会按后缀自动分组：.com 进入国内候选，其它后缀进入海外候选。提交后会打开 GitHub issue，统计任务处理后页面会自动显示新候选。</p>
+            </div>
+            <form class="add-form" id="addDomainForm">
+              <label class="field-label" for="domainInput">域名</label>
+              <div class="domain-input-row">
+                <input class="domain-input" id="domainInput" name="domain" type="text" inputmode="url" autocomplete="off" placeholder="example.ai 或 example.com" value="">
+                <button class="submit-btn add-btn" type="submit">添加域名</button>
+              </div>
+              <p class="helper-line">可输入裸域名或 URL；系统会去掉 https://、www. 和路径。</p>
+              <p class="add-status ${state.addStatus ? "is-error" : ""}" id="addDomainStatus">${escapeHtml(state.addStatus)}</p>
+            </form>
+          </div>
+        </article>
+      `;
+    }
+
     function renderSummary() {
       domesticPick.textContent = state.picks.domestic || "未选择";
       overseasPick.textContent = state.picks.overseas || "未选择";
@@ -755,6 +907,8 @@
       });
       if (state.view === "ranking") {
         renderRanking();
+      } else if (state.view === "add") {
+        renderAddDomain();
       } else {
         renderTickets();
       }
@@ -783,6 +937,29 @@
       return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
     }
 
+    function addDomainUrl(domain) {
+      const group = groupForDomain(domain);
+      const payload = {
+        type: "brand-domain-add",
+        version: 1,
+        domain,
+        group,
+        submittedAt: new Date().toISOString()
+      };
+      const body = [
+        "Add brand domain candidate",
+        "",
+        "```json",
+        JSON.stringify(payload, null, 2),
+        "```"
+      ].join("\n");
+      const params = new URLSearchParams({
+        title: `Add domain: ${domain}`,
+        body
+      });
+      return `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?${params.toString()}`;
+    }
+
     document.addEventListener("click", (event) => {
       const tab = event.target.closest(".tab");
       if (tab) {
@@ -801,6 +978,27 @@
       }
     });
 
+    document.addEventListener("submit", (event) => {
+      const form = event.target.closest("#addDomainForm");
+      if (!form) return;
+      event.preventDefault();
+      const input = form.querySelector("#domainInput");
+      const domain = normalizeDomain(input.value);
+      state.addStatus = "";
+      if (!validDomain(domain)) {
+        state.addStatus = "请输入有效域名，例如 example.ai 或 example.com。";
+        render();
+        return;
+      }
+      if (hasCandidate(domain)) {
+        state.addStatus = "这个域名已经在候选列表中，可以直接投票。";
+        render();
+        return;
+      }
+      window.open(addDomainUrl(domain), "_blank", "noopener,noreferrer");
+      input.value = domain;
+    });
+
     submitVote.addEventListener("click", () => {
       if (submitVote.disabled) return;
       window.open(submitUrl(), "_blank", "noopener,noreferrer");
@@ -815,9 +1013,16 @@
         state.results = {
           generatedAt: null,
           totalVoters: 0,
-          domestic: Object.fromEntries(domestic.map((domain) => [domain, { votes: 0 }])),
-          overseas: Object.fromEntries(overseas.map((domain) => [domain, { votes: 0 }]))
+          domestic: Object.fromEntries(baseDomestic.map((domain) => [domain, { votes: 0 }])),
+          overseas: Object.fromEntries(baseOverseas.map((domain) => [domain, { votes: 0 }])),
+          addedDomains: []
         };
+      }
+      for (const group of ["domestic", "overseas"]) {
+        state.results[group] ||= {};
+        for (const domain of group === "domestic" ? baseDomestic : baseOverseas) {
+          state.results[group][domain] ||= { votes: 0 };
+        }
       }
       render();
     }

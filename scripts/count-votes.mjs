@@ -1,13 +1,13 @@
 import { writeFile } from "node:fs/promises";
 
-const domestic = [
+const baseDomestic = [
   "KunlunGround.com",
   "OrbitTasker.com",
   "annocrew.com",
   "crowdAnno.com"
 ];
 
-const overseas = [
+const baseOverseas = [
   "humanbench.ai",
   "crowdbench.ai",
   "omnitruth.ai",
@@ -67,8 +67,25 @@ async function fetchIssues() {
   return issues;
 }
 
-function parseVote(issue) {
-  if (!issue.title?.startsWith("Vote:")) return null;
+function normalizeDomain(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/.*$/, "")
+    .toLowerCase();
+}
+
+function validDomain(domain) {
+  return /^(?=.{4,253}$)(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/i.test(domain)
+    && !domain.split(".").some((part) => part.startsWith("-") || part.endsWith("-"));
+}
+
+function groupForDomain(domain) {
+  return domain.endsWith(".com") ? "domestic" : "overseas";
+}
+
+function extractPayload(issue, expectedType) {
   const match = issue.body?.match(/```json\s*([\s\S]*?)```/i);
   if (!match) return null;
 
@@ -79,14 +96,50 @@ function parseVote(issue) {
     return null;
   }
 
-  if (payload.type !== "brand-domain-vote") return null;
-  if (!domestic.includes(payload.domestic)) return null;
-  if (!overseas.includes(payload.overseas)) return null;
+  return payload.type === expectedType ? payload : null;
+}
+
+function candidateMaps(domestic, overseas) {
+  return {
+    domestic: new Map(domestic.map((domain) => [domain.toLowerCase(), domain])),
+    overseas: new Map(overseas.map((domain) => [domain.toLowerCase(), domain]))
+  };
+}
+
+function parseAddDomain(issue, maps) {
+  if (!issue.title?.startsWith("Add domain:")) return null;
+  const payload = extractPayload(issue, "brand-domain-add");
+  if (!payload) return null;
+
+  const domain = normalizeDomain(payload.domain);
+  if (!validDomain(domain)) return null;
+
+  const group = groupForDomain(domain);
+  if (maps.domestic.has(domain) || maps.overseas.has(domain)) return null;
+
+  return {
+    domain,
+    group,
+    user: issue.user?.login || "unknown",
+    issue: issue.html_url,
+    createdAt: issue.created_at,
+    submittedAt: payload.submittedAt || issue.created_at
+  };
+}
+
+function parseVote(issue, maps) {
+  if (!issue.title?.startsWith("Vote:")) return null;
+  const payload = extractPayload(issue, "brand-domain-vote");
+  if (!payload) return null;
+
+  const domestic = maps.domestic.get(normalizeDomain(payload.domestic));
+  const overseas = maps.overseas.get(normalizeDomain(payload.overseas));
+  if (!domestic || !overseas) return null;
 
   return {
     user: issue.user?.login || "unknown",
-    domestic: payload.domestic,
-    overseas: payload.overseas,
+    domestic,
+    overseas,
     issue: issue.html_url,
     createdAt: issue.created_at,
     submittedAt: payload.submittedAt || issue.created_at
@@ -103,10 +156,28 @@ function increment(group, domain) {
 }
 
 const issues = await fetchIssues();
+const domestic = [...baseDomestic];
+const overseas = [...baseOverseas];
+const maps = candidateMaps(domestic, overseas);
+const addedDomains = [];
+
+for (const issue of issues) {
+  const added = parseAddDomain(issue, maps);
+  if (!added) continue;
+  addedDomains.push(added);
+  if (added.group === "domestic") {
+    domestic.push(added.domain);
+    maps.domestic.set(added.domain, added.domain);
+  } else {
+    overseas.push(added.domain);
+    maps.overseas.set(added.domain, added.domain);
+  }
+}
+
 const latestByUser = new Map();
 
 for (const issue of issues) {
-  const vote = parseVote(issue);
+  const vote = parseVote(issue, maps);
   if (!vote) continue;
   const previous = latestByUser.get(vote.user);
   if (!previous || new Date(vote.createdAt) >= new Date(previous.createdAt)) {
@@ -120,6 +191,7 @@ const result = {
   totalVoters: votes.length,
   domestic: emptyCounts(domestic),
   overseas: emptyCounts(overseas),
+  addedDomains: addedDomains.sort((a, b) => a.domain.localeCompare(b.domain)),
   votes
 };
 
