@@ -211,11 +211,13 @@ function parseVote(issue, maps) {
   const overseasPayload = Array.isArray(payload.overseas) ? payload.overseas : [payload.overseas];
   const domestic = [...new Set(domesticPayload.map((domain) => maps.domestic.get(normalizeDomain(domain))).filter(Boolean))].slice(0, 3);
   const overseas = [...new Set(overseasPayload.map((domain) => maps.overseas.get(normalizeDomain(domain))).filter(Boolean))].slice(0, 3);
-  if (domestic.length + overseas.length === 0) return null;
+  const isClear = payload.clear === true;
+  if (!isClear && domestic.length + overseas.length === 0) return null;
 
   return {
     voterId: payload.voterId || null,
     user: issue.user?.login || "unknown",
+    clear: isClear,
     domestic,
     overseas,
     choices: [...domestic, ...overseas],
@@ -266,16 +268,17 @@ for (const issue of issues) {
 }
 
 const votes = [...latestByUser.values()].sort((a, b) => a.user.localeCompare(b.user));
+const activeVotes = votes.filter((vote) => !vote.clear);
 const result = {
   generatedAt: new Date().toISOString(),
-  totalVoters: votes.length,
+  totalVoters: activeVotes.length,
   domestic: emptyCounts(domestic),
   overseas: emptyCounts(overseas),
   addedDomains: addedDomains.sort((a, b) => a.domain.localeCompare(b.domain)),
-  votes
+  votes: activeVotes
 };
 
-for (const vote of votes) {
+for (const vote of activeVotes) {
   for (const domain of vote.domestic) increment(result.domestic, domain);
   for (const domain of vote.overseas) increment(result.overseas, domain);
 }

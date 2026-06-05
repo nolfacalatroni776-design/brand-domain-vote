@@ -219,17 +219,19 @@ async function resultWithVote(payload, createdIssue) {
   const voterKey = payload.voterId;
   const votes = (Array.isArray(current.votes) ? current.votes : [])
     .filter((vote) => (vote.voterId || vote.user) !== voterKey);
-  const createdAt = createdIssue.created_at || payload.submittedAt;
-  votes.push({
-    voterId: payload.voterId,
-    user: "api",
-    domestic: payload.domestic,
-    overseas: payload.overseas,
-    choices: [...payload.domestic, ...payload.overseas],
-    issue: createdIssue.html_url,
-    createdAt,
-    submittedAt: payload.submittedAt
-  });
+  if (!payload.clear) {
+    const createdAt = createdIssue.created_at || payload.submittedAt;
+    votes.push({
+      voterId: payload.voterId,
+      user: "api",
+      domestic: payload.domestic,
+      overseas: payload.overseas,
+      choices: [...payload.domestic, ...payload.overseas],
+      issue: createdIssue.html_url,
+      createdAt,
+      submittedAt: payload.submittedAt
+    });
+  }
   votes.sort((a, b) => (a.user || "").localeCompare(b.user || "") || String(a.voterId || "").localeCompare(String(b.voterId || "")));
 
   const result = {
@@ -277,6 +279,7 @@ async function buildVoteIssue(input) {
   if (!validVoterKey(voterKey)) {
     return { error: "请输入 2-80 个字符的投票人标识。", status: 400 };
   }
+  const isClear = input.clear === true;
 
   const { domestic, overseas } = await fetchCandidates();
   const maps = mapCandidates(domestic, overseas);
@@ -287,7 +290,7 @@ async function buildVoteIssue(input) {
     .map((domain) => maps.overseas.get(normalizeDomain(domain)))
     .filter(Boolean))].slice(0, MAX_VOTES_PER_GROUP);
 
-  if (domesticChoices.length + overseasChoices.length === 0) {
+  if (!isClear && domesticChoices.length + overseasChoices.length === 0) {
     return { error: "请选择至少一个候选域名。", status: 400 };
   }
 
@@ -296,13 +299,14 @@ async function buildVoteIssue(input) {
     type: "brand-domain-vote",
     version: 3,
     voterId,
+    clear: isClear,
     domestic: domesticChoices,
     overseas: overseasChoices,
     submittedVia: "api",
     submittedAt: new Date().toISOString()
   };
   return {
-    title: `Vote: ${voterId.slice(0, 12)}`,
+    title: `Vote: ${voterId.slice(0, 12)}${isClear ? " clear" : ""}`,
     body: issueBody("Brand domain vote", payload),
     payload
   };

@@ -647,13 +647,32 @@
       box-shadow: 0 12px 26px rgba(255, 125, 85, 0.28);
     }
 
-    .submit-btn:disabled {
+    .vote-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .clear-vote-btn {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--coral-dark);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .submit-btn:disabled,
+    .clear-vote-btn:disabled {
       cursor: not-allowed;
       opacity: 0.48;
       box-shadow: none;
     }
 
-    .submit-btn.is-busy {
+    .submit-btn.is-busy,
+    .clear-vote-btn.is-busy {
       cursor: wait;
       opacity: 0.72;
     }
@@ -839,7 +858,10 @@
           <span>投票人标识</span>
           <input class="voter-input" id="voterInput" type="text" autocomplete="name" placeholder="姓名或工号">
         </label>
-        <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
+        <div class="vote-actions">
+          <button class="submit-btn" id="submitVote" type="button" disabled>提交投票</button>
+          <button class="clear-vote-btn" id="clearVote" type="button" disabled>清空已投票</button>
+        </div>
         <p class="vote-status" id="voteStatus"></p>
         <p class="note">提交后会直接记录并刷新榜单。每组最多 3 票，可以只提交 1 票或 2 票；统计按投票人标识去重，取最后一次有效提交。</p>
 
@@ -935,6 +957,7 @@
     const pickBox = document.getElementById("pickBox");
     const voterInput = document.getElementById("voterInput");
     const submitVote = document.getElementById("submitVote");
+    const clearVote = document.getElementById("clearVote");
     const voteStatus = document.getElementById("voteStatus");
     const quickRanking = document.getElementById("quickRanking");
     const listTitle = document.getElementById("listTitle");
@@ -1209,6 +1232,9 @@
       submitVote.disabled = allChoices().length === 0 || !validVoterKey(state.voterKey) || state.isSubmitting;
       submitVote.classList.toggle("is-busy", state.isSubmitting);
       submitVote.textContent = state.isSubmitting ? "提交中..." : "提交投票";
+      clearVote.disabled = !validVoterKey(state.voterKey) || state.isSubmitting;
+      clearVote.classList.toggle("is-busy", state.isSubmitting);
+      clearVote.textContent = state.isSubmitting ? "处理中..." : "清空已投票";
       voteStatus.className = `vote-status ${state.voteTone ? `is-${state.voteTone}` : ""}`;
       voteStatus.textContent = state.voteStatus || (validVoterKey(state.voterKey)
         ? `国内 ${groupChoices("domestic").length}/3，海外 ${groupChoices("overseas").length}/3`
@@ -1243,6 +1269,16 @@
         voterKey: normalizeVoterKey(state.voterKey),
         domestic: [...groupChoices("domestic")],
         overseas: [...groupChoices("overseas")]
+      };
+    }
+
+    function clearVotePayload() {
+      return {
+        kind: "vote",
+        clear: true,
+        voterKey: normalizeVoterKey(state.voterKey),
+        domestic: [],
+        overseas: []
       };
     }
 
@@ -1301,6 +1337,46 @@
         state.voteTone = "success";
       } catch (error) {
         state.voteStatus = error.message || "提交失败，请稍后重试。";
+        state.voteTone = "error";
+      } finally {
+        state.isSubmitting = false;
+        renderSummary();
+      }
+    }
+
+    async function clearVoteDirectly() {
+      if (state.isSubmitting) return;
+      const voterKey = normalizeVoterKey(state.voterKey);
+      state.voteStatus = "";
+      state.voteTone = "";
+      if (!validVoterKey(voterKey)) {
+        state.voteStatus = "请输入 2-80 个字符的投票人标识。";
+        state.voteTone = "error";
+        renderSummary();
+        return;
+      }
+      if (!window.confirm("确认清空该投票人标识下此前提交的所有投票？")) return;
+
+      state.voterKey = voterKey;
+      localStorage.setItem("brandVote.voterKey", voterKey);
+      state.isSubmitting = true;
+      state.voteStatus = "清空中...";
+      renderSummary();
+
+      try {
+        const data = await postSubmission(clearVotePayload());
+        state.picks.domestic = [];
+        state.picks.overseas = [];
+        persistChoices("domestic");
+        persistChoices("overseas");
+        if (data.result) {
+          state.results = normalizeResult(data.result);
+          render();
+        }
+        state.voteStatus = data.result ? "已清空此前投票，榜单已刷新。" : "已清空此前投票，榜单稍后刷新。";
+        state.voteTone = "success";
+      } catch (error) {
+        state.voteStatus = error.message || "清空失败，请稍后重试。";
         state.voteTone = "error";
       } finally {
         state.isSubmitting = false;
@@ -1415,6 +1491,11 @@
     submitVote.addEventListener("click", () => {
       if (submitVote.disabled) return;
       submitVoteDirectly();
+    });
+
+    clearVote.addEventListener("click", () => {
+      if (clearVote.disabled) return;
+      clearVoteDirectly();
     });
 
     async function loadResults() {
