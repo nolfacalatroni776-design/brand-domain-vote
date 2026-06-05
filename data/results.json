@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-06-05T05:20:06.172Z",
+  "generatedAt": "2026-06-05T05:22:06.295Z",
   "totalVoters": 1,
   "domestic": {
     "KunlunGround.com": {
-      "votes": 0
+      "votes": 1
     },
     "OrbitTasker.com": {
       "votes": 0
     },
     "annocrew.com": {
-      "votes": 1
+      "votes": 0
     },
     "crowdAnno.com": {
       "votes": 0
@@ -17,7 +17,7 @@
   },
   "overseas": {
     "humanbench.ai": {
-      "votes": 0
+      "votes": 1
     },
     "crowdbench.ai": {
       "votes": 0
@@ -107,15 +107,18 @@
       "voterId": "fc071081fe81a2694cafb59e0aec1cea4f22bcb9d8d5222a281bd79a95377102",
       "user": "nolfacalatroni776-design",
       "domestic": [
-        "annocrew.com"
+        "KunlunGround.com"
       ],
-      "overseas": [],
+      "overseas": [
+        "humanbench.ai"
+      ],
       "choices": [
-        "annocrew.com"
+        "KunlunGround.com",
+        "humanbench.ai"
       ],
-      "issue": "https://github.com/nolfacalatroni776-design/brand-domain-vote/issues/2",
-      "createdAt": "2026-06-05T05:14:15Z",
-      "submittedAt": "2026-06-05T05:14:15.380Z"
+      "issue": "https://github.com/nolfacalatroni776-design/brand-domain-vote/issues/5",
+      "createdAt": "2026-06-05T05:22:00Z",
+      "submittedAt": "2026-06-05T05:22:00.788Z"
     }
   ]
 }
